@@ -12,18 +12,18 @@
 # https://github.com/ehabets/RIR-Generator/blob/master/rir_generator.cpp
 
 # Usage: prep_sim_rirs.sh <output-dir>
-# E.g. prep_sim_rirs.sh data/simulated_rir_mediumroom
+# E.g. prep_sim_rirs.sh data/simulated_rir_largeroom
 
 
 sampling_rate=8000     # Sampling rate of the output RIR waveform
 output_bit=16          # bits per sample in the RIR waveform
-num_room=50            # number of rooms to be sampled
+num_room=200           # number of rooms to be sampled
 rir_per_room=100       # number of RIR to be sampled for each room
-prefix="medium-"        # prefix to the RIR id
+prefix="medium-"       # prefix to the RIR id
 room_lower_bound=10    # lower bound of the room length and width
 room_upper_bound=30    # upper bound of the room length and width
 rir_duration=1         # duration of the output RIR waveform in secs
-                       # the smaller the room is, the sooner the RIR stablizes
+                       # the smaller the room is, the faster the RIR stabilizes
                        # one should set a smaller duration for small room configs
                        # to avoid getting a lot of zeros at the tail of the waveform
                        # and speed up the generation process
@@ -88,11 +88,10 @@ for room_id = 1 : $num_room
 
     % Sample the microphone position
     Mic_xyz = [rand*Room_xyz(1) rand*Room_xyz(2) rand*Room_xyz(3)];    % Receiver position [x y z]
-    fprintf(file_room_info, '%s %3.2f %3.2f %3.2f %3.2f %3.2f %3.2f %3.2f\n', room_name, Room_xyz, Mic_xyz, absorption);
+    fprintf(file_room_info, '%s%s %3.2f %3.2f %3.2f %3.2f %3.2f %3.2f %3.2f\n', RIRset_prefix, room_name, Room_xyz, Mic_xyz, absorption);
 
     for rir_id = 1 : $rir_per_room
         rir_id
-        resample_time = 0;
         while 1
             % Sample a point within the sphere
             elevation = asin(2*rand - 1);
@@ -105,13 +104,8 @@ for room_id = 1 : $num_room
             if Source_xyz <= Room_xyz & Source_xyz >= 0
                 break
             end
-            resample_time = resample_time + 1;
         end
-        resample_time
-        before_generate = 1
         [rir] = rir_generator(c, fs, Mic_xyz, Source_xyz, Room_xyz, Reflect, num_sample, mtype, order, dim, orientation, hp_filter);
-        after_generate = 1
-        %rir = rir / max(rir);            %Normalize the RIR
         rir_name = strcat(room_name, '-', sprintf('%05d',rir_id));
         rir_filename = strcat(room_dir, '/', rir_name, '.wav');
         audiowrite(rir_filename, rir, fs, 'BitsPerSample', BitsPerSample);
