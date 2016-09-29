@@ -3,16 +3,32 @@
 # Apache 2.0
 # Script to simulate room impulse responses (RIRs)
 
+# This script uses the image method based on an implementation
+# by Habets et al to simulate the room impulse responses (RIRs).
+# It samples the room parameters and receiver position in the room
+# and then randomly generate a number of RIRs according to different speaker positions.
+# To use this script you need to have MATLAB installed and
+# download the RIR generator from
+# https://github.com/ehabets/RIR-Generator/blob/master/rir_generator.cpp
+
+# Usage: prep_sim_rirs.sh <output-dir>
+# E.g. prep_sim_rirs.sh data/simulated_rir_mediumroom
+
+
 sampling_rate=8000     # Sampling rate of the output RIR waveform
-output_bit=16          # bits of each sample in the RIR waveform
+output_bit=16          # bits per sample in the RIR waveform
 num_room=50            # number of rooms to be sampled
 rir_per_room=100       # number of RIR to be sampled for each room
-prefix="large-"                # prefix to the RIR id
-room_lower_bound=10    # lower boung of the room length and width
-room_upper_bound=30    # upper boung of the room length and width
-rir_duration=2         # duration of the output RIR waveform in secs
+prefix="medium-"        # prefix to the RIR id
+room_lower_bound=10    # lower bound of the room length and width
+room_upper_bound=30    # upper bound of the room length and width
+rir_duration=1         # duration of the output RIR waveform in secs
+                       # the smaller the room is, the sooner the RIR stablizes
+                       # one should set a smaller duration for small room configs
+                       # to avoid getting a lot of zeros at the tail of the waveform
+                       # and speed up the generation process
+                       # e.g. for a room within 10m x 10m, the RIRs usually stablize within 0.5 sec
 generator="./rir_generator.cpp"   # path to the RIR generator
-
 
 if [ $# != 1 ]; then
   echo "Usage: "
@@ -27,19 +43,22 @@ mkdir -p $output_dir
 
 cat >./genrir.m <<EOF
 mex $generator
-c = 340;                    % Sound velocity (m/s)
-fs = $sampling_rate;        % Sample frequency (samples/s)
-num_sample = fs * $rir_duration;          % Number of samples
-mtype = 'omnidirectional';  % Type of microphone
-order = 10;                  % Reflection order
-dim = 3;                    % Room dimension
-orientation = 0;            % Microphone orientation (rad)
-hp_filter = 0;              % Enable high-pass filter
-BitsPerSample = $output_bit;
-Room_bound_x = [$room_lower_bound $room_upper_bound];      % upper and lower bound of the room size in sampling
-Room_bound_y = [$room_lower_bound $room_upper_bound];
-Room_bound_z = [2 5];
-Absorption_bound = [0.2 0.8];
+c = 340;                          % Sound velocity (m/s)
+fs = $sampling_rate;              % Sample frequency (samples/s)
+num_sample = fs * $rir_duration;  % Number of samples
+mtype = 'omnidirectional';        % Type of microphone
+order = 10;                       % Reflection order
+dim = 3;                          % Room dimension
+orientation = 0;                  % Microphone orientation (rad)
+hp_filter = 0;                    % Enable high-pass filter
+BitsPerSample = $output_bit;      % Bits per sample in the RIR waveform
+Room_bound_x = [$room_lower_bound $room_upper_bound];   % range for sampling the length of the room (m)
+Room_bound_y = [$room_lower_bound $room_upper_bound];   % range for sampling the width of the room
+Room_bound_z = [2 5];                 % range for sampling the height of the room
+Absorption_bound = [0.2 0.8];         % range for sampling the absorption coefficient
+                                      % The absorption coefficient of a material is a number between 0 and 1
+                                      % E.g. for a material which offer no reflection, it would have
+                                      % an absorption coefficient very close to 1
 SMD_bound = [0 5];                    % allowed range for speaker microphone distances (SMDs)
 output_dir = '$output_dir';
 RIRset_prefix = '$prefix';
